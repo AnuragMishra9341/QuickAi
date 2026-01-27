@@ -2,6 +2,12 @@ import OpenAI from "openai";
 import sql from "../config/db.js";
 import { clerkClient } from "@clerk/express";
 import axios from "axios";
+import {v2 as cloudinary} from 'cloudinary';
+import FormData from "form-data";
+import fs from 'fs';
+import pdf from 'pdf-parse/lib/pdf-parse.js'
+
+
 
 const AI = new OpenAI({
   apiKey: process.env.GEMINI_API_KEY,
@@ -130,25 +136,202 @@ export const generateImage = async (req, res) => {
     responseType:"arraybuffer",
    });
 
+    // console.log("Data is -> ",data);
+
    const base64Image = `data:image/png;base64,${Buffer.from(data,'binary').toString('base64')}`;
 
-    await sql`INSERT INTO CREATIONS (user_id,prompt,content,type)
-      values (${userId},${prompt},${content},'blog-title')`;
+    //  console.log("base64Image is -> ",base64Image);
 
-    if (plan !== "premium") {
-      await clerkClient.users.updateUserMetadata(userId, {
-        privateMetadata: {
-          free_usage: free_usage + 1,
-        },
-      });
-    }
 
-    res.status(200).json({ success: true, content });
+    const {secure_url} =  await cloudinary.uploader.upload(base64Image)
+
+    // console.log("secure_url is -> ",secure_url);
+
+    await sql`INSERT INTO CREATIONS (user_id,prompt,content,type,publish)
+      values (${userId},${prompt},${secure_url},'image',${publish ?? false})`;
+
+
+    res.status(200).json({ success: true, content:secure_url });
   } catch (error) {
-    console.log(error.message);
+    console.log(error);
     res.status(500).json({
       success: false,
       message: error.message,
     });
   }
 };  
+
+
+
+export const removeImageBackground = async (req, res) => {
+  try {
+    const { userId } = req.auth();
+    const { image } = req.file;  // from multer
+    const plan = req.plan;
+    
+
+    if (plan !== "premium" ) {
+      return res.status(403).json({
+        success: false,
+        message: "This feature is only available for premium subscriptions",
+      });
+    }
+    
+
+   
+
+   
+
+   
+
+    const {secure_url} =  await cloudinary.uploader.upload(image.path,{
+         transformation:[
+          {
+            effect:'background_removal',
+            background_removal : 'remove_the_background'
+          }
+         ]
+    })
+
+   fs.unlinkSync(image.path);
+
+    // console.log("secure_url is -> ",secure_url);
+
+    await sql`INSERT INTO CREATIONS (user_id,prompt,content,type)
+      values (${userId},'Remove background from image',${secure_url},'image')`;
+
+
+    res.status(200).json({ success: true, content:secure_url });
+  } catch (error) {
+    if (image?.path) {
+fs.unlinkSync(image.path);
+}
+    console.log(error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};  
+
+
+
+
+export const removeImageObject = async (req, res) => {
+  try {
+    const { userId } = req.auth();
+    const { image } = req.file;  // from multer
+    const plan = req.plan;
+    const {object} = req.body;
+    
+
+    if (plan !== "premium" ) {
+      return res.status(403).json({
+        success: false,
+        message: "This feature is only available for premium subscriptions",
+      });
+    }
+    
+
+   
+
+   
+
+   
+
+    const {public_id} =  await cloudinary.uploader.upload(image.path);
+   
+    const imageUrl = cloudinary.url(public_id,{
+      transformation:[{effect : `gen_remove : ${object}`}],
+      resource_type:'image'
+    })
+
+     fs.unlinkSync(image.path);
+
+    
+
+    await sql`INSERT INTO CREATIONS (user_id,prompt,content,type)
+      values (${userId},${`Remove ${object} from image`},${imageUrl},'image')`;
+
+
+    res.status(200).json({ success: true, content:imageUrl });
+  } catch (error) {
+    if (image?.path) {
+fs.unlinkSync(image.path);
+}
+    console.log(error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};  
+
+
+
+
+
+export const resumeReview = async (req, res) => {
+  try {
+    const { userId } = req.auth();
+    const { resume } = req.file;  // from multer
+    const plan = req.plan;
+    
+
+    if (plan !== "premium" ) {
+      return res.status(403).json({
+        success: false,
+        message: "This feature is only available for premium subscriptions",
+      });
+    }
+    
+
+   
+
+   
+
+   
+
+   if(resume.size > 5*1024*1024){
+    return res.json({success:false,message:"Resume file size exceeds allowed size (5MB)."})
+   }
+
+
+   const dataBuffer = fs.readFileSync(resume.path);
+
+   const pdfData = await pdf(dataBuffer);
+
+   const prompt = `Review the following resume and provide
+    constructive feedback on its strengths, weaknesses, and areas for
+    improvements. Resume Content:\n\n${pdfData.text}
+   `
+
+   const response = await AI.chat.completions.create({
+      model: "gemini-3-flash-preview",
+      messages: [
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+      temperature: 0.7,
+      max_tokens: 1000,
+    });
+  
+    const content = response.choices[0].message.content;
+    
+
+    await sql`INSERT INTO CREATIONS (user_id,prompt,content,type)
+      values (${userId},'Review the uploaded resume',${content},'resume-review')`;
+
+
+    res.status(200).json({ success: true, content });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};  
+
