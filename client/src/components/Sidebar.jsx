@@ -11,22 +11,8 @@ import {
   FileText,
   Users,
   LogOut,
+  X,
 } from "lucide-react";
-
-/*   isActive comes from NavLink (React Router itself).
-You did not create it.
-React Router calculates it by comparing the current URL with the to prop.
-
-When they match → isActive = true
-When they don’t → isActive = false
-
-
-The precise rule (memorize this)
-
-end = true ⇒ the URL must match to EXACTLY
-end = false ⇒ prefix matching is allowed
-
-   */
 
 const navItems = [
   { to: "/ai", label: "Dashboard", Icon: House },
@@ -42,21 +28,39 @@ const navItems = [
 const Sidebar = ({ sidebar, setSidebar }) => {
   const { user } = useUser();
   const { signOut, openUserProfile } = useClerk();
+
   return (
     <div
-      className={`w-60 bg-white border-r border-gray-200 flex flex-col
-    justify-between items-center max-sm:absolute top-14 bottom-0
-    ${sidebar ? "translate-x-0" : "max-sm-translate-x-full"}
-    transition-all duration-300 ease-in-out
-    `}
+      className={`
+        bg-white border-r border-gray-200 flex flex-col
+        justify-between items-center
+        transition-transform duration-300 ease-in-out
+
+        /* desktop */
+        sm:relative sm:translate-x-0 sm:w-60
+
+        /* mobile fullscreen drawer */
+        fixed inset-0 z-50 w-full
+        ${sidebar ? "translate-x-0" : "-translate-x-full"}
+      `}
     >
+      {/*  Close button (mobile only) */}
+      <button
+        onClick={() => setSidebar(false)}
+        className="absolute top-4 right-4 sm:hidden"
+      >
+        <X className="w-6 h-6 text-gray-600" />
+      </button>
+
+      {/* Top section */}
       <div className="my-7 w-full">
         <img
           src={user.imageUrl}
           alt="User avatar"
-          className="w-13 rounded-full mx-auto"
+          className="w-14 rounded-full mx-auto"
         />
-        <h1 className="mt-1 text-center">{user.fullName}</h1>
+        <h1 className="mt-1 text-center font-medium">{user.fullName}</h1>
+
         <div className="px-6 mt-5 text-sm text-gray-600 font-medium">
           {navItems.map(({ to, label, Icon }) => (
             <NavLink
@@ -65,12 +69,21 @@ const Sidebar = ({ sidebar, setSidebar }) => {
               end={to === "/ai"}
               onClick={() => setSidebar(false)}
               className={({ isActive }) =>
-                `px-3.5 py-2.5 flex items-center gap-3 rounded ${isActive ? "bg-gradient-to-r from-[#3c81f6] to-[#9234EA] text-white" : ""}`
+                `px-3.5 py-2.5 flex items-center gap-3 rounded transition
+                ${
+                  isActive
+                    ? "bg-gradient-to-r from-[#3c81f6] to-[#9234EA] text-white"
+                    : "hover:bg-gray-100"
+                }`
               }
             >
               {({ isActive }) => (
                 <>
-                  <Icon className={`w-4 h-4 ${isActive ? "text-white" : ""}`} />
+                  <Icon
+                    className={`w-4 h-4 ${
+                      isActive ? "text-white" : "text-gray-500"
+                    }`}
+                  />
                   {label}
                 </>
               )}
@@ -79,7 +92,8 @@ const Sidebar = ({ sidebar, setSidebar }) => {
         </div>
       </div>
 
-      <div className="W-full border-t border-gray-200 p-4 px-7 flex items-center justify-between">
+      {/* Bottom section */}
+      <div className="w-full border-t border-gray-200 p-4 px-7 flex items-center justify-between">
         <div
           onClick={openUserProfile}
           className="flex gap-2 items-center cursor-pointer"
@@ -88,11 +102,14 @@ const Sidebar = ({ sidebar, setSidebar }) => {
           <div>
             <h1 className="text-sm font-medium">{user.fullName}</h1>
             <p className="text-xs text-gray-500">
-                <Protect plan='premium' fallback='Free'>Premium</Protect>
-                <span> Plan</span>
+              <Protect plan="premium" fallback="Free">
+                Premium
+              </Protect>{" "}
+              Plan
             </p>
           </div>
         </div>
+
         <LogOut
           onClick={signOut}
           className="w-4.5 text-gray-400 hover:text-gray-700 transition cursor-pointer"
