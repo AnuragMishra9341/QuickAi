@@ -13,7 +13,13 @@ const app = express();
  await connectCloudinary();
 
 
-app.use(cors());
+app.use(
+cors({
+origin: process.env.FRONTEND_URL,
+credentials: true,
+})
+);
+
 app.use(express.json());
 app.use(clerkMiddleware());
 
