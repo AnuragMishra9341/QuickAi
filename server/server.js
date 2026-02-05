@@ -5,9 +5,12 @@ import { clerkMiddleware, clerkClient, requireAuth, getAuth } from '@clerk/expre
 import aiRouter from './routes/aiRoutes.js';
 import userRouter from './routes/userRoutes.js';
 import connectCloudinary from './config/cloudinary.js';
+
+
 /* 1>clerkMiddleware parses the req and attaches and auth object to it
    2> required auth is used a route protector 
 */
+
 
 const app = express();
  await connectCloudinary();
